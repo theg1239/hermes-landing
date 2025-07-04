@@ -1,46 +1,53 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion } from "framer-motion"
+import { asciiArt } from "@/lib/ascii-art"
 
 interface BootupSequenceProps {
-  onComplete: () => void
+  onComplete?: () => void
 }
 
 export function BootupSequence({ onComplete }: BootupSequenceProps) {
+  const [logoProgress, setLogoProgress] = useState(0)
   const [currentStep, setCurrentStep] = useState(0)
-  const [loadingProgress, setLoadingProgress] = useState(0)
+  const [hasCompletedFullCycle, setHasCompletedFullCycle] = useState(false)
 
   const bootSteps = [
     "SYSTEM INITIALIZATION...",
-    "LOADING NEURAL PATHWAYS...",
+    "LOADING NEURAL PATHWAYS...", 
     "ESTABLISHING CONNECTIONS...",
     "HERMES NETWORK ONLINE",
   ]
 
-  const asciiLogo = [
-    "██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗",
-    "██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝",
-    "███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗",
-    "██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║",
-    "██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║",
-    "╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝",
-  ]
+  const asciiLogo = asciiArt.hermes.split('\n').filter(line => line.trim() !== '')
+
+  const maxLength = Math.max(...asciiLogo.map(line => line.length))
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setLoadingProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(timer)
-          setTimeout(onComplete, 1000)
-          return 100
+    const logoTimer = setInterval(() => {
+      setLogoProgress((prev) => {
+        const nextProgress = (prev + 1) % (maxLength + 1)
+        
+        if (prev === maxLength && nextProgress === 0 && !hasCompletedFullCycle) {
+          setHasCompletedFullCycle(true)
         }
-        return prev + 1.5
+        
+        return nextProgress
       })
-    }, 80)
+    }, 50)
 
-    return () => clearInterval(timer)
-  }, [onComplete])
+    return () => clearInterval(logoTimer)
+  }, [maxLength, hasCompletedFullCycle])
+
+  useEffect(() => {
+    if (hasCompletedFullCycle) {
+      const completeTimer = setTimeout(() => {
+        onComplete?.()
+      }, 100)
+
+      return () => clearTimeout(completeTimer)
+    }
+  }, [hasCompletedFullCycle, onComplete])
 
   useEffect(() => {
     const stepTimer = setInterval(() => {
@@ -51,60 +58,36 @@ export function BootupSequence({ onComplete }: BootupSequenceProps) {
   }, [bootSteps.length])
 
   const getVisibleText = (line: string, progress: number) => {
-    const totalChars = line.length
-    const visibleChars = Math.floor((progress / 100) * totalChars)
-    return line.slice(0, visibleChars)
+    if (progress === 0) return ""
+    const totalLength = line.length
+    const visibleLength = Math.min(progress, totalLength)
+    
+    const charsPerSide = Math.floor(visibleLength / 2)
+    const extraChar = visibleLength % 2
+    
+    const leftChars = charsPerSide + extraChar
+    const rightChars = charsPerSide
+    
+    const leftPart = line.slice(0, leftChars)
+    const rightPart = rightChars > 0 ? line.slice(-rightChars) : ""
+    
+    const middleSpacing = totalLength - leftChars - rightChars
+    const middlePart = " ".repeat(middleSpacing)
+    
+    return leftPart + middlePart + rightPart
   }
 
   return (
     <div className="bootup-screen">
       <div className="bootup-content">
-        {/* ASCII Logo with Character-by-Character Loading */}
         <div className="ascii-logo">
           {asciiLogo.map((line, index) => (
             <div key={index} className="ascii-line-centered">
-              <span className="ascii-visible">{getVisibleText(line, loadingProgress)}</span>
-              <span className="ascii-cursor">
-                {loadingProgress < 100 && getVisibleText(line, loadingProgress).length < line.length ? "█" : ""}
+              <span className="ascii-visible">
+                {getVisibleText(line, logoProgress)}
               </span>
             </div>
           ))}
-        </div>
-
-        {/* Loading Bar */}
-        <div className="loading-section">
-          <div className="loading-bar-container">
-            <div className="loading-bar-bg">
-              <motion.div
-                className="loading-bar-fill"
-                initial={{ width: 0 }}
-                animate={{ width: `${loadingProgress}%` }}
-                transition={{ duration: 0.1, ease: "linear" }}
-              />
-            </div>
-            <div className="loading-percentage">{Math.floor(loadingProgress)}%</div>
-          </div>
-
-          {/* Boot Messages */}
-          <div className="boot-messages">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="boot-message"
-            >
-              {"> "}
-              {bootSteps[currentStep]}
-            </motion.div>
-          </div>
-        </div>
-
-        {/* System Info */}
-        <div className="system-info">
-          <div>HERMES NEURAL INTERFACE v2.1.4</div>
-          <div>Copyright (c) 2024 Neural Systems Corp.</div>
-          <div>All rights reserved.</div>
         </div>
       </div>
     </div>
